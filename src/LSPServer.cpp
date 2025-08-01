@@ -15,7 +15,7 @@ namespace LSP {
         // Start the server and listen for incoming requests
 
         while (true) {
-            // Step 1: Read the "Content-Length" header
+            // Read the "Content-Length" header
             std::string contentLengthHeader;
             std::getline(std::cin, contentLengthHeader);
             if (contentLengthHeader.empty()) {
@@ -27,20 +27,20 @@ namespace LSP {
             try {
                 contentLength = std::stoi(contentLengthHeader.substr(16));
             } catch (const std::exception &e) {
-                // Log an error, but for now we'll just continue
+                // Log an error
                 continue;
             }
 
-            // Step 2: Read the mandatory blank line after the header
+            // Read the mandatory blank line after the header
             std::string blankLine;
             std::getline(std::cin, blankLine);
 
-            // Step 3: Read the JSON content itself
+            // Read the JSON content itself
             std::vector<char> jsonBuffer(contentLength);
             std::cin.read(jsonBuffer.data(), contentLength);
             std::string jsonContent(jsonBuffer.begin(), jsonBuffer.end());
 
-            // Step 4: Parse and process the message
+            // Parse and process the message
             parseMessage(jsonContent);
         }
     }
@@ -51,11 +51,37 @@ namespace LSP {
             if (request.contains("method")) {
                 std::string method = request["method"];
 
-                std::cerr << request.dump(4) << std::endl;
+                std::cerr << "[Received Request] " << request.dump(4)
+                          << std::endl;
 
                 if (method == "initialize") {
                     // Handle the "initialize" request
-                    handleInitialize(request);
+                    onInitialize(request);
+                } else if (method == "textDocument/didChange") {
+                    // Handle the "didChangeContent" notification
+                    onDidChangeContent(request);
+                } else if (method == "textDocument/didSave") {
+                    // Handle the "didSave" notification
+                    std::cerr << "[Did Save] "
+                              << request["params"]["textDocument"]["uri"]
+                              << std::endl;
+                    // Here you would typically save the document state
+                } else if (method == "textDocument/completion") {
+                    // Handle the "completion" request
+                    onCompletion(request);
+                } else if (method == "completionItem/resolve") {
+                    // Handle the "completionResolve" request
+                    onCompletionResolve(request);
+                } else {
+                    // Handle other methods or send an error response
+                    json errorResponse = {
+                        {"jsonrpc", "2.0"},
+                        {"id", 1},
+                        {"result", nullptr},
+                        {"error",
+                         {{"code", -32601}, // Method not found
+                          {"message", "Method not found: " + method}}}};
+                    sendResponse(errorResponse);
                 }
             }
         } catch (const json::parse_error &e) {
@@ -69,18 +95,86 @@ namespace LSP {
         std::cout << "Content-Length: " << responseStr.size() << "\r\n\r\n"
                   << responseStr;
         std::cout.flush();
+        std::cerr << "[Sent Response] " << response.dump(4) << std::endl;
     }
 
-    void Server::handleInitialize(const json &request) {
+    void Server::onInitialize(const json &request) {
         // Handle the "initialize" request
         json response = {{"jsonrpc", "2.0"},
                          {"id", request["id"]},
                          {"result",
                           {{"capabilities",
-                            {
-                                // Advertise the features your server supports
-                                {"textDocumentSync", 1}, // 1 = Full sync
-                            }}}}};
+                            {// Advertise the features your server supports
+                             {"textDocumentSync", 2}, // 2 = Incremental sync
+                             {"completionProvider",
+                              {{"resolveProvider", true},
+                               {"triggerCharacters", {".", "@"}}}}}}}}};
+        sendResponse(response);
+    }
+
+    void Server::onDidChangeContent(const json &request) {
+        // Handle the "didChangeContent" notification
+        std::cerr << "[Did Change Content] \""
+                  << request["params"]["contentChanges"][0]["text"].dump(4)
+                  << "\"" << std::endl;
+        // Here you would typically update your document model
+    }
+    void Server::onCompletion(const json &request) {
+        // Handle the "completion" request
+        json response = {
+            {"jsonrpc", "2.0"},
+            {"id", request["id"]},
+            {"result",
+             {{"isIncomplete", false},
+              {"items",
+               {{{"label", "Hello"},
+                 {"kind", 1}, // Text
+                 {"sortText", "0001"},
+                 {"detail", "Hello from swirl C++ lsp server"},
+                 {"documentation", "Text completion from swirl LSP server"}},
+                {{"label", "from"},
+                 {"kind", 2}, // Method
+                 {"sortText", "0002"},
+                 {"detail", "from swirl C++ lsp server"},
+                 {"documentation", "Method completion from swirl LSP server"}},
+                {{"label", "swirl"},
+                 {"kind", 3}, // Function
+                 {"sortText", "0003"},
+                 {"detail", "swirl C++ lsp server"},
+                 {"documentation",
+                  "Function completion from swirl LSP server"}},
+                {{"label", "C++"},
+                 {"kind", 6}, // Class
+                 {"sortText", "0004"},
+                 {"detail", "C++ lsp server"},
+                 {"documentation", "Class completion from swirl LSP server"}},
+                {{"label", "lsp"},
+                 {"kind", 7}, // Interface
+                 {"sortText", "0005"},
+                 {"detail", "lsp server"},
+                 {"documentation",
+                  "Interface completion from swirl LSP server"}},
+                {{"label", "server"},
+                 {"kind", 9}, // Module
+                 {"sortText", "0006"},
+                 {"detail", "server"},
+                 {"documentation",
+                  "Module completion from swirl LSP server"}}}}}}};
+        sendResponse(response);
+    }
+    void Server::onCompletionResolve(const json &request) {
+        // Handle the "completionResolve" request
+        json response = {
+            {"jsonrpc", "2.0"},
+            {"id", request["id"]},
+            {"result",
+             {{"label", request["params"]["label"]},
+              {"kind", request["params"]["kind"]},
+              {"detail",
+               "Resolved: " + request["params"]["label"].get<std::string>()},
+              {"documentation",
+               "Resolved documentation for " +
+                   request["params"]["label"].get<std::string>()}}}};
         sendResponse(response);
     }
 } // namespace LSP

@@ -47,7 +47,7 @@ async function initializeServer() {
         "initialize",
         initializeParams
     );
-    console.log('Received "initialize" response:', result);
+    // console.log('Received "initialize" response:', result);
 }
 
 // Listen for notifications from the server (e.g., diagnostics)
@@ -67,8 +67,24 @@ const autocompleteParams = {
         character: 0,
     },
 };
-// const autocompleteResult = await connection.sendRequest("textDocument/completion", autocompleteParams);
+const autocompleteResult = await connection.sendRequest("textDocument/completion", autocompleteParams);
 // console.log("Received autocomplete result:", autocompleteResult);
+const content = "import stuff from 'module';\n\nfn example() {\n    // Example function\n}\n";
+const didChangeContentParams = {
+    textDocument: {
+        uri: "file:///path/to/document",
+        version: 1, // Increment this version for each change
+    },
+    contentChanges: [
+        {
+            text: content, // The new content of the document
+        },
+    ],
+};
+console.log("Sending 'didChangeContent' notification...");
+connection.sendNotification("textDocument/didChange", didChangeContentParams).then((result) => {
+    console.log("Received 'didChangeContent' notification response:\n", result);
+});
 
 
 // Initialize the server

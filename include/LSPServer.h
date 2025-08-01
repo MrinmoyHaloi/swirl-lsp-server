@@ -6,14 +6,18 @@ using json = nlohmann::json;
 namespace LSP {
 
     class Server {
-    public:
+      public:
         Server();
         ~Server();
         void run();
-    private:
+
+      private:
         void processRequest(const json &request);
         void sendResponse(const json &response);
         void parseMessage(const std::string &jsonContent);
-        void handleInitialize(const json &request);
+        void onInitialize(const json &request);
+        void onDidChangeContent(const json &request);
+        void onCompletion(const json &request);
+        void onCompletionResolve(const json &request);
     };
-}
+} // namespace LSP
