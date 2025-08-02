@@ -3,7 +3,7 @@
 #include <regex>
 #include <utility>
 
-namespace LSP {
+namespace lsp {
 
     Server::Server() {
         std::cerr << "LSP Server initialized." << std::endl;
@@ -28,7 +28,7 @@ namespace LSP {
             int contentLength = 0;
             try {
                 contentLength = std::stoi(contentLengthHeader.substr(16));
-            } catch (const std::exception &e) {
+            } catch (const std::exception& e) {
                 // Log an error
                 continue;
             }
@@ -47,7 +47,7 @@ namespace LSP {
         }
     }
 
-    void Server::parseMessage(const std::string &jsonContent) {
+    void Server::parseMessage(const std::string& jsonContent) {
         try {
             json request = json::parse(jsonContent);
             if (request.contains("method")) {
@@ -91,13 +91,13 @@ namespace LSP {
                     sendResponse(errorResponse);
                 }
             }
-        } catch (const json::parse_error &e) {
+        } catch (const json::parse_error& e) {
             // Log JSON parsing error
             std::cerr << "JSON parse error: " << e.what() << std::endl;
         }
     }
 
-    void Server::sendResponse(const json &response) {
+    void Server::sendResponse(const json& response) {
         std::string responseStr = response.dump();
         std::cout << "Content-Length: " << responseStr.size() << "\r\n\r\n"
                   << responseStr;
@@ -105,7 +105,7 @@ namespace LSP {
         // std::cerr << "[Sent Response] " << response.dump(4) << std::endl;
     }
 
-    void Server::onInitialize(const json &request) {
+    void Server::onInitialize(const json& request) {
         // Handle the "initialize" request
         json response = {{"jsonrpc", "2.0"},
                          {"id", request["id"]},
@@ -116,14 +116,13 @@ namespace LSP {
                              {"completionProvider",
                               {{"resolveProvider", true},
                                {"triggerCharacters", {".", "@"}}}},
-                                {"diagnosticsProvider",
-                                 {{"interFileDependencies", true},
-                                  {"workspaceDiagnostics", true}}}
-                            }}}}};
+                             {"diagnosticsProvider",
+                              {{"interFileDependencies", true},
+                               {"workspaceDiagnostics", true}}}}}}}};
         sendResponse(response);
     }
 
-    void Server::onDidOpen(const json &request) {
+    void Server::onDidOpen(const json& request) {
         // Handle the "didOpen" notification
         if (request.contains("params") &&
             request["params"].contains("textDocument")) {
@@ -142,7 +141,7 @@ namespace LSP {
         }
     }
 
-    void Server::onDidChangeContent(const json &request) {
+    void Server::onDidChangeContent(const json& request) {
         // Handle the "didChangeContent" notification
         if (request.contains("params")) {
             std::string uri = request["params"]["textDocument"]["uri"];
@@ -152,7 +151,7 @@ namespace LSP {
             if (request["params"].contains("contentChanges")) {
                 auto changes = request["params"]["contentChanges"];
 
-                for (const auto &change : changes) {
+                for (const auto& change : changes) {
                     if (change.contains("text") && !change.contains("range")) {
                         // Full document update
                         std::string newText = change["text"];
@@ -174,7 +173,7 @@ namespace LSP {
                       << " (version: " << version << ")" << std::endl;
         }
     }
-    void Server::onCompletion(const json &request) {
+    void Server::onCompletion(const json& request) {
         // Handle the "completion" request
         json response = {
             {"jsonrpc", "2.0"},
@@ -217,7 +216,7 @@ namespace LSP {
                   "Module completion from swirl LSP server"}}}}}}};
         sendResponse(response);
     }
-    void Server::onCompletionResolve(const json &request) {
+    void Server::onCompletionResolve(const json& request) {
         // Handle the "completionResolve" request
         json result = request["params"];
         if (result.contains("sortText")) {
@@ -228,45 +227,45 @@ namespace LSP {
             {"jsonrpc", "2.0"}, {"id", request["id"]}, {"result", result}};
         sendResponse(response);
     }
-    void Server::onSetTrace(const json &request) {
+    void Server::onSetTrace(const json& request) {
         // Handle the "setTrace" notification
         std::string traceValue = request["params"]["value"];
         std::cerr << "[Set Trace] " << traceValue << std::endl;
     }
 
-    void Server::storeDocument(const std::string &uri,
-                               const std::string &content, int version) {
+    void Server::storeDocument(const std::string& uri,
+                               const std::string& content, int version) {
         documents[uri] = content;
-        documentVersions[uri] = version;
+        document_versions[uri] = version;
         std::cerr << "[Document Stored] " << uri << " (version: " << version
                   << ")" << std::endl;
     }
 
-    void Server::updateDocument(const std::string &uri,
-                                const std::string &newContent, int version) {
+    void Server::updateDocument(const std::string& uri,
+                                const std::string& newContent, int version) {
         if (hasDocument(uri)) {
             documents[uri] = newContent;
-            documentVersions[uri] = version;
+            document_versions[uri] = version;
             std::cerr << "[Document Updated] " << uri
                       << " (version: " << version << ")" << std::endl;
         }
     }
 
-    void Server::removeDocument(const std::string &uri) {
+    void Server::removeDocument(const std::string& uri) {
         documents.erase(uri);
-        documentVersions.erase(uri);
+        document_versions.erase(uri);
         std::cerr << "[Document Removed] " << uri << std::endl;
     }
 
-    std::string Server::getDocument(const std::string &uri) {
+    std::string Server::getDocument(const std::string& uri) {
         return documents.contains(uri) ? documents[uri] : "";
     }
 
-    bool Server::hasDocument(const std::string &uri) {
+    bool Server::hasDocument(const std::string& uri) {
         return documents.contains(uri);
     }
 
-    void Server::validateDocument(const std::string &uri) {
+    void Server::validateDocument(const std::string& uri) {
         std::string content = getDocument(uri);
         if (content.empty()) {
             return;
@@ -316,7 +315,7 @@ namespace LSP {
                   << " issues in " << uri << std::endl;
     }
 
-    std::pair<int, int> Server::calculatePosition(const std::string &content,
+    std::pair<int, int> Server::calculatePosition(const std::string& content,
                                                   size_t offset) {
         int line = 0;
         int character = 0;

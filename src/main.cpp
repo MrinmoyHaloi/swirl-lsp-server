@@ -1,7 +1,7 @@
 #include "LSPServer.h"
 
 int main() {
-    LSP::Server server;
+    lsp::Server server;
     server.run();
     return 0;
 }
