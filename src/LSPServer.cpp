@@ -60,6 +60,8 @@ namespace LSP {
                 } else if (method == "textDocument/didChange") {
                     // Handle the "didChangeContent" notification
                     onDidChangeContent(request);
+                } else if (method == "textDocument/didOpen") {
+                    onDidOpen(request);
                 } else if (method == "textDocument/didSave") {
                     // Handle the "didSave" notification
                     std::cerr << "[Did Save] "
@@ -72,6 +74,9 @@ namespace LSP {
                 } else if (method == "completionItem/resolve") {
                     // Handle the "completionResolve" request
                     onCompletionResolve(request);
+                } else if (method == "$/setTrace") {
+                    // Handle the "setTrace" request
+                    onSetTrace(request);
                 } else {
                     // Handle other methods or send an error response
                     json errorResponse = {
@@ -110,6 +115,13 @@ namespace LSP {
                               {{"resolveProvider", true},
                                {"triggerCharacters", {".", "@"}}}}}}}}};
         sendResponse(response);
+    }
+
+    void Server::onDidOpen(const json &request) {
+        // Handle the "didOpen" notification
+        std::cerr << "[Did Open] " << request["params"]["textDocument"]["uri"]
+                  << std::endl;
+        // Here you would typically load the document into your model
     }
 
     void Server::onDidChangeContent(const json &request) {
@@ -164,17 +176,18 @@ namespace LSP {
     }
     void Server::onCompletionResolve(const json &request) {
         // Handle the "completionResolve" request
+        json result = request["params"];
+        if (result.contains("sortText")) {
+            result.erase("sortText");
+        }
+
         json response = {
-            {"jsonrpc", "2.0"},
-            {"id", request["id"]},
-            {"result",
-             {{"label", request["params"]["label"]},
-              {"kind", request["params"]["kind"]},
-              {"detail",
-               "Resolved: " + request["params"]["label"].get<std::string>()},
-              {"documentation",
-               "Resolved documentation for " +
-                   request["params"]["label"].get<std::string>()}}}};
+            {"jsonrpc", "2.0"}, {"id", request["id"]}, {"result", result}};
         sendResponse(response);
+    }
+    void Server::onSetTrace(const json &request) {
+        // Handle the "setTrace" notification
+        std::string traceValue = request["params"]["value"];
+        std::cerr << "[Set Trace] " << traceValue << std::endl;
     }
 } // namespace LSP

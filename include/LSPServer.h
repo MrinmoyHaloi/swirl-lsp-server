@@ -19,5 +19,7 @@ namespace LSP {
         void onDidChangeContent(const json &request);
         void onCompletion(const json &request);
         void onCompletionResolve(const json &request);
+        void onSetTrace(const json &request);
+        void onDidOpen(const json &request);
     };
 } // namespace LSP
