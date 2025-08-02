@@ -110,7 +110,7 @@ namespace LSP {
                          {"result",
                           {{"capabilities",
                             {// Advertise the features your server supports
-                             {"textDocumentSync", 2}, // 2 = Incremental sync
+                             {"textDocumentSync", 1}, // 1 = Full sync
                              {"completionProvider",
                               {{"resolveProvider", true},
                                {"triggerCharacters", {".", "@"}}}}}}}}};
@@ -119,17 +119,48 @@ namespace LSP {
 
     void Server::onDidOpen(const json &request) {
         // Handle the "didOpen" notification
-        std::cerr << "[Did Open] " << request["params"]["textDocument"]["uri"]
-                  << std::endl;
-        // Here you would typically load the document into your model
+        if (request.contains("params") &&
+            request["params"].contains("textDocument")) {
+            std::string uri = request["params"]["textDocument"]["uri"];
+            std::string text = request["params"]["textDocument"]["text"];
+            int version = request["params"]["textDocument"]["version"];
+
+            // Store the document
+            storeDocument(uri, text, version);
+
+            std::cerr << "[Did Open] " << uri << " (length: " << text.length()
+                      << ")" << std::endl;
+        }
     }
 
     void Server::onDidChangeContent(const json &request) {
         // Handle the "didChangeContent" notification
-        std::cerr << "[Did Change Content] \""
-                  << request["params"]["contentChanges"][0]["text"].dump(4)
-                  << "\"" << std::endl;
-        // Here you would typically update your document model
+        if (request.contains("params")) {
+            std::string uri = request["params"]["textDocument"]["uri"];
+            int version = request["params"]["textDocument"]["version"];
+
+            // Handle incremental changes
+            if (request["params"].contains("contentChanges")) {
+                auto changes = request["params"]["contentChanges"];
+
+                for (const auto &change : changes) {
+                    if (change.contains("text") && !change.contains("range")) {
+                        // Full document update
+                        std::string newText = change["text"];
+                        updateDocument(uri, newText, version);
+                    } else if (change.contains("range") &&
+                               change.contains("text")) {
+                        // Incremental update - you'd need to implement
+                        // range-based updates
+                        std::cerr << "[Incremental Change] Not implemented yet"
+                                  << std::endl;
+                    }
+                }
+            }
+
+            std::cerr << "[Did Change Content] " << uri
+                      << " (version: " << version << ")" << std::endl;
+        }
     }
     void Server::onCompletion(const json &request) {
         // Handle the "completion" request
@@ -189,5 +220,38 @@ namespace LSP {
         // Handle the "setTrace" notification
         std::string traceValue = request["params"]["value"];
         std::cerr << "[Set Trace] " << traceValue << std::endl;
+    }
+
+    void Server::storeDocument(const std::string &uri,
+                               const std::string &content, int version) {
+        documents[uri] = content;
+        documentVersions[uri] = version;
+        std::cerr << "[Document Stored] " << uri << " (version: " << version
+                  << ")" << std::endl;
+    }
+
+    void Server::updateDocument(const std::string &uri,
+                                const std::string &newContent, int version) {
+        if (hasDocument(uri)) {
+            documents[uri] = newContent;
+            documentVersions[uri] = version;
+            std::cerr << "[Document Updated] " << uri
+                      << " (version: " << version << ")" << std::endl;
+        }
+    }
+
+    void Server::removeDocument(const std::string &uri) {
+        documents.erase(uri);
+        documentVersions.erase(uri);
+        std::cerr << "[Document Removed] " << uri << std::endl;
+    }
+
+    std::string Server::getDocument(const std::string &uri) {
+        auto it = documents.find(uri);
+        return (it != documents.end()) ? it->second : "";
+    }
+
+    bool Server::hasDocument(const std::string &uri) {
+        return documents.find(uri) != documents.end();
     }
 } // namespace LSP
