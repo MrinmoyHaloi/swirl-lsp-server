@@ -32,7 +32,7 @@ namespace LSP {
         void processRequest(const json &request);
         void sendResponse(const json &response);
         void parseMessage(const std::string &jsonContent);
-        
+
         // Request handlers
         void onInitialize(const json &request);
         void onDidOpen(const json &request);
@@ -40,5 +40,9 @@ namespace LSP {
         void onCompletion(const json &request);
         void onCompletionResolve(const json &request);
         void onSetTrace(const json &request);
+
+        void validateDocument(const std::string &uri);
+        std::pair<int, int> calculatePosition(const std::string &content,
+                                                  size_t offset);
     };
 } // namespace LSP

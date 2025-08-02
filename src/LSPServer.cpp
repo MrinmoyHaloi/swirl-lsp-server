@@ -1,5 +1,7 @@
 #include "LSPServer.h"
 #include <iostream>
+#include <regex>
+#include <utility>
 
 namespace LSP {
 
@@ -51,8 +53,8 @@ namespace LSP {
             if (request.contains("method")) {
                 std::string method = request["method"];
 
-                std::cerr << "[Received Request] " << request.dump(4)
-                          << std::endl;
+                // std::cerr << "[Received Request] " << request.dump(4)
+                //           << std::endl;
 
                 if (method == "initialize") {
                     // Handle the "initialize" request
@@ -100,7 +102,7 @@ namespace LSP {
         std::cout << "Content-Length: " << responseStr.size() << "\r\n\r\n"
                   << responseStr;
         std::cout.flush();
-        std::cerr << "[Sent Response] " << response.dump(4) << std::endl;
+        // std::cerr << "[Sent Response] " << response.dump(4) << std::endl;
     }
 
     void Server::onInitialize(const json &request) {
@@ -113,7 +115,11 @@ namespace LSP {
                              {"textDocumentSync", 1}, // 1 = Full sync
                              {"completionProvider",
                               {{"resolveProvider", true},
-                               {"triggerCharacters", {".", "@"}}}}}}}}};
+                               {"triggerCharacters", {".", "@"}}}},
+                                {"diagnosticsProvider",
+                                 {{"interFileDependencies", true},
+                                  {"workspaceDiagnostics", true}}}
+                            }}}}};
         sendResponse(response);
     }
 
@@ -127,6 +133,9 @@ namespace LSP {
 
             // Store the document
             storeDocument(uri, text, version);
+
+            // Validate the document
+            validateDocument(uri);
 
             std::cerr << "[Did Open] " << uri << " (length: " << text.length()
                       << ")" << std::endl;
@@ -157,6 +166,9 @@ namespace LSP {
                     }
                 }
             }
+
+            // Validate the document after changes
+            validateDocument(uri);
 
             std::cerr << "[Did Change Content] " << uri
                       << " (version: " << version << ")" << std::endl;
@@ -247,11 +259,77 @@ namespace LSP {
     }
 
     std::string Server::getDocument(const std::string &uri) {
-        auto it = documents.find(uri);
-        return (it != documents.end()) ? it->second : "";
+        return documents.contains(uri) ? documents[uri] : "";
     }
 
     bool Server::hasDocument(const std::string &uri) {
-        return documents.find(uri) != documents.end();
+        return documents.contains(uri);
+    }
+
+    void Server::validateDocument(const std::string &uri) {
+        std::string content = getDocument(uri);
+        if (content.empty()) {
+            return;
+        }
+
+        // Find the import statements and check if they don't provide any
+        // package
+        std::regex import_pattern(R"(\bimport(?! \w))");
+        std::sregex_iterator start(content.begin(), content.end(),
+                                   import_pattern);
+        std::sregex_iterator end;
+
+        json diagnostics = json::array();
+
+        for (std::sregex_iterator i = start; i != end; ++i) {
+            std::smatch match = *i;
+            size_t match_pos = match.position();
+            size_t match_length = match.length();
+
+            // Calculate line and character positions
+            auto start_pos = calculatePosition(content, match_pos);
+            auto end_pos = calculatePosition(content, match_pos + match_length);
+
+            json diagnostic = {
+                {"severity", 1}, // Error severity
+                {"range",
+                 {{"start",
+                   {{"line", start_pos.first},
+                    {"character", start_pos.second}}},
+                  {"end",
+                   {{"line", end_pos.first}, {"character", end_pos.second}}}}},
+                {"message", "No package name provided"},
+                {"source", "Swirl"}};
+
+            diagnostics.push_back(diagnostic);
+        }
+
+        // Send the computed diagnostics
+        json diagnosticsNotification = {
+            {"jsonrpc", "2.0"},
+            {"method", "textDocument/publishDiagnostics"},
+            {"params", {{"uri", uri}, {"diagnostics", diagnostics}}}};
+
+        sendResponse(diagnosticsNotification);
+
+        std::cerr << "[Diagnostics] Found " << diagnostics.size()
+                  << " issues in " << uri << std::endl;
+    }
+
+    std::pair<int, int> Server::calculatePosition(const std::string &content,
+                                                  size_t offset) {
+        int line = 0;
+        int character = 0;
+
+        for (size_t i = 0; i < offset && i < content.length(); ++i) {
+            if (content[i] == '\n') {
+                line++;
+                character = 0;
+            } else {
+                character++;
+            }
+        }
+
+        return {line, character};
     }
 } // namespace LSP
