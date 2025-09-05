@@ -39,6 +39,7 @@ namespace lsp {
         void onDidChangeContent(const json& request);
         void onCompletion(const json& request);
         void onCompletionResolve(const json& request);
+        void onHover(const json& request);
         void onSetTrace(const json& request);
 
         void validateDocument(const std::string& uri);

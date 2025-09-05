@@ -3,10 +3,40 @@
 #include <regex>
 #include <utility>
 
+size_t positionToOffset(const std::string& content, int line, int character) {
+        int currentLine = 0;
+        int currentChar = 0;
+        for (size_t i = 0; i < content.length(); ++i) {
+            if (currentLine == line && currentChar == character) {
+                return i;
+            }
+            if (content[i] == '\n') {
+                currentLine++;
+                currentChar = 0;
+            } else {
+                currentChar++;
+            }
+        }
+        return content.length(); // Return end of file if not found
+    }
+
+std::string getWordAt(const std::string& content, int line, int character) {
+    if (content.empty()) return "";
+
+    size_t offset = positionToOffset(content, line, character);
+
+    size_t start = offset, end = offset;
+    while (start > 0 && std::isalnum(content[start - 1])) start--;
+    while (end < content.size() && std::isalnum(content[end])) end++;
+    
+    if (start >= end) return "";
+    return content.substr(start, end - start);
+}
+
 namespace lsp {
 
     Server::Server() {
-        std::cerr << "LSP Server initialized." << std::endl;
+        std::cerr << "LSP Server initialized" << std::endl;
     }
 
     Server::~Server() {
@@ -53,8 +83,8 @@ namespace lsp {
             if (request.contains("method")) {
                 std::string method = request["method"];
 
-                // std::cerr << "[Received Request] " << request.dump(4)
-                //           << std::endl;
+                std::cerr << "[Received Request] " << method
+                          << std::endl;
 
                 if (method == "initialize") {
                     // Handle the "initialize" request
@@ -76,6 +106,12 @@ namespace lsp {
                 } else if (method == "completionItem/resolve") {
                     // Handle the "completionResolve" request
                     onCompletionResolve(request);
+                } else if (method == "textDocument/hover") {
+                    // Handle the "hover" request
+                    onHover(request);
+                    std::cerr << "[Hover] "
+                              << request["params"]["textDocument"]["uri"]
+                              << std::endl;
                 } else if (method == "$/setTrace") {
                     // Handle the "setTrace" request
                     onSetTrace(request);
@@ -118,7 +154,8 @@ namespace lsp {
                                {"triggerCharacters", {".", "@"}}}},
                              {"diagnosticsProvider",
                               {{"interFileDependencies", true},
-                               {"workspaceDiagnostics", true}}}}}}}};
+                               {"workspaceDiagnostics", true}}},
+                             {"hoverProvider", true}}}}}};
         sendResponse(response);
     }
 
@@ -330,5 +367,36 @@ namespace lsp {
         }
 
         return {line, character};
+    }
+
+    void Server::onHover(const json& request) {
+        // Handle the "hover" request
+        std::string uri = request["params"]["textDocument"]["uri"];
+        int line = request["params"]["position"]["line"];
+        int character = request["params"]["position"]["character"];
+        std::string content = getDocument(uri);
+
+        std::string word = getWordAt(content, line, character);
+
+        std::string hoverText = "No info available";
+        if (!word.empty()) {
+            hoverText = "Hover info for `" + word + "`";
+        }
+
+        json response = {
+            {"jsonrpc", "2.0"},
+            {"id", request["id"]},
+            {"result",
+                {
+                    {"contents",
+                        {
+                            {"kind", "markdown"},
+                            {"value", hoverText}
+                        }
+                    }
+                }
+            }
+        };
+        sendResponse(response);
     }
 } // namespace LSP
