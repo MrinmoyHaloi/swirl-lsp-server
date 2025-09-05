@@ -1,4 +1,4 @@
-# swirl-lsp-server
+# Swirl Language Server
 
 Next Gen Language Server for Swirl written in C++. Currently only has dummy implementations for lsp methods.
 
